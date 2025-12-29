@@ -1,5 +1,6 @@
 from .bert_loader import BERT_Loader
 from .unsup_loader import UNSUP_Loader
+from .sdc_loader import SDC_Loader
 
 max_seq_lengths = {     'stackoverflow':45,
                         'clinc':30, 
@@ -23,7 +24,8 @@ backbone_loader_map = {
                             'bert_SCCL' : BERT_Loader,
                             'bert_GCD': BERT_Loader,
                             'bert_CC': BERT_Loader,
-                            'bert_DeepAligned': BERT_Loader
+                            'bert_DeepAligned': BERT_Loader,
+                            'bert_SDC' : SDC_Loader
                       }
 
 benchmark_labels = {
