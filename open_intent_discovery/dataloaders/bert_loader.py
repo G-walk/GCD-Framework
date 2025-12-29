@@ -53,6 +53,7 @@ class BERT_Loader:
                 self.get_examples_dtc_predict(args ,base_attrs)
 
         self.num_train_examples = len(self.train_examples)
+    
     def get_examples_dtc_predict(self, args ,base_attrs):
 
         num_val_cls = round(base_attrs['n_known_cls'] * 0.75 )
@@ -103,8 +104,11 @@ def get_examples(args, base_attrs, mode):
             train_labels = np.array([example.label for example in ori_examples])
             train_labeled_ids = []
             for label in base_attrs['known_label_list']:
+                # 1. 算出该类别需要多少个有标样本 (比如总数 * 0.5)
                 num = round(len(train_labels[train_labels == label]) * args.labeled_ratio)
+                # 2. 找到该类别所有样本的索引
                 pos = list(np.where(train_labels == label)[0])
+                # 3. 【随机采样】抽选这些索引
                 train_labeled_ids.extend(random.sample(pos, num))
 
             labeled_examples, unlabeled_examples = [], []
