@@ -14,6 +14,7 @@ from .unsupervised.DCN.manager import DCNManager
 from .unsupervised.SCCL.manager import SCCLmanager
 from .unsupervised.CC.manager import CCmanager
 from .unsupervised.USNID.manager import UnsupUSNIDManager
+from .semi_supervised.SDC.manager import SDCmanager
 
 
 method_map = {
@@ -32,5 +33,6 @@ method_map = {
                 'MTP_CLNN':MTP_CLNNManager,
                 'SCCL' : SCCLmanager,
                 'CC' : CCmanager,
-                'UnsupUSNID': UnsupUSNIDManager
+                'UnsupUSNID': UnsupUSNIDManager,
+                'SDC' : SDCmanager
             }

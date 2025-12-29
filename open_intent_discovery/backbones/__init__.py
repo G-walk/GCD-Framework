@@ -3,6 +3,7 @@ from .bert import BertForConstrainClustering, BertForDTC, BertForKCL_Similarity,
         BERT_USNID, BERT_USNID_UNSUP
 from .glove import GloVeEmbeddingVectorizer
 from .sae import get_stacked_autoencoder
+from .bert_sdc import BERT_SDC
 
 backbones_map = {   
                     'bert_CDAC': BertForConstrainClustering,
@@ -19,5 +20,6 @@ backbones_map = {
                     'bert_SCCL' : Bert_SCCL,
                     'bert_GCD' : BERT_GCD,
                     'bert_CC' : BERT_CC,
-                    'bert_DeepAligned' : BERTForDeepAligned
+                    'bert_DeepAligned' : BERTForDeepAligned,
+                    'bert_SDC' : BERT_SDC
                 }
