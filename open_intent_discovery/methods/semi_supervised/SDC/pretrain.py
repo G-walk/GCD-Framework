@@ -1,13 +1,17 @@
 from utils.utils import *
 from model import *
 from dataloader import *
-from model import BertForModel
+from ....backbones.bert_sdc import BertForModel
 from transformers import WEIGHTS_NAME, CONFIG_NAME, logging
 import warnings
 from init_parameter import init_model
+from utils.functions import save_model, restore_model
 
-class PretrainModelManager:
-    def __init__(self, args, data):
+class PretrainSDCManager:
+    def __init__(self, args, data, logger_name = 'Discovery'):
+        self.logger = logging.getLogger(logger_name)
+        args.num_labels = data.n_known_cls
+        
         set_seed(args.seed)
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,6 +24,22 @@ class PretrainModelManager:
 
         self.optimizer, self.scheduler = self.get_optimizer(args)
         self.best_eval_score = 0
+
+        if args.pretrain:
+            
+            self.logger.info('Pre-raining start...')
+            self.train(args, data)
+            self.logger.info('Pre-training finished...')
+            
+        else:
+            self.model = restore_model(self.model, os.path.join(args.method_output_dir, 'pretrain'))
+            
+        if args.cluster_num_factor > 1:
+            self.num_labels = data.num_labels
+            self.num_labels = self.predict_k(args, data) 
+
+        self.model.to(torch.device('cpu'))
+        torch.cuda.empty_cache()
 
     def eval(self, args, data):
         self.model.eval()

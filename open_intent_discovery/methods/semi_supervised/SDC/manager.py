@@ -18,12 +18,14 @@ from scipy.optimize import linear_sum_assignment
 from sklearn import mixture
 from transformers import logging, WEIGHTS_NAME
 from init_parameter import init_model
-from pretrain import PretrainModelManager
+from pretrain import PretrainSDCManager
 from model import BertForOT, BertForModel
 import seaborn as sn
 class SDCmanager:
 
     def __init__(self, args, data, pretrained_model):
+        pretrain_manager = PretrainSDCManager(args, data)
+
         set_seed(args.seed)
         args.method  = 'bias'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
