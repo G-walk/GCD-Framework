@@ -1,10 +1,10 @@
 from utils.utils import *
-from model import *
-from dataloader import *
+# from model import *
+# from dataloader import *
 from ....backbones.bert_sdc import BertForModel
 from transformers import WEIGHTS_NAME, CONFIG_NAME, logging
 import warnings
-from init_parameter import init_model
+# from init_parameter import init_model
 from utils.functions import save_model, restore_model
 
 class PretrainSDCManager:
@@ -47,7 +47,7 @@ class PretrainSDCManager:
         total_labels = torch.empty(0, dtype=torch.long).to(self.device)
         total_logits = torch.empty((0, data.n_known_cls)).to(self.device)
 
-        for batch in tqdm(data.eval_dataloader, desc="pre-training-eval"):
+        for batch in tqdm(data.loader.loader.eval_outputs['loader'], desc="pre-training-eval"):
             batch = tuple(t.to(self.device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             X = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": segment_ids}
@@ -68,7 +68,7 @@ class PretrainSDCManager:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
         wait = 0
         best_model = None
-        mlm_iter = iter(data.train_semi_dataloader)
+        mlm_iter = iter(data.dataloader.train_outputs['loader'])
 
         for epoch in range(int(args.num_pretrain_epochs)):
             print('---------------------------')
@@ -77,7 +77,7 @@ class PretrainSDCManager:
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
 
-            for step, batch in enumerate(tqdm(data.train_labeled_dataloader, desc="Pre-training")):
+            for step, batch in enumerate(tqdm(data.dataloader.train_labeled_outputs['loader'], desc="Pre-training")):
                 batch = tuple(t.to(self.device) for t in batch)
                 input_ids, input_mask, segment_ids, label_ids = batch
                 X = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": segment_ids}
@@ -86,7 +86,7 @@ class PretrainSDCManager:
                     batch = tuple(t.to(self.device) for t in batch)
                     input_ids, input_mask, segment_ids, labels = batch
                 except StopIteration:
-                    mlm_iter = iter(data.train_semi_dataloader)
+                    mlm_iter = iter(data.dataloader.train_outputs['loader'])
                     batch = mlm_iter.next()
                     batch = tuple(t.to(self.device) for t in batch)
                     input_ids, input_mask, segment_ids, labels = batch
@@ -130,8 +130,14 @@ class PretrainSDCManager:
                     break
 
         self.model = best_model
+        # if args.save_model:
+        #     self.save_model(args)
+        # 把保存模型换成框架的
         if args.save_model:
-            self.save_model(args)
+            pretrained_model_dir = os.path.join(args.method_output_dir, 'pretrain')
+            if not os.path.exists(pretrained_model_dir):
+                os.makedirs(pretrained_model_dir)
+            save_model(self.model, pretrained_model_dir)
 
     def get_optimizer(self, args):
         num_warmup_steps = int(args.warmup_proportion * self.num_train_optimization_steps)
@@ -189,17 +195,17 @@ class PretrainSDCManager:
         torch.save(self.model.state_dict(), model_file)
 
 
-if __name__ == '__main__':
-    warnings.filterwarnings('ignore')
-    logging.set_verbosity_error()
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# if __name__ == '__main__':
+#     warnings.filterwarnings('ignore')
+#     logging.set_verbosity_error()
+#     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    print('Data and Parameters Initialization...')
-    parser = init_model()
-    args = parser.parse_args()
-    data = Data(args)
+#     print('Data and Parameters Initialization...')
+#     parser = init_model()
+#     args = parser.parse_args()
+#     data = Data(args)
 
-    print('Pre-training begin...')
-    manager_pre = PretrainModelManager(args, data)
-    manager_pre.train(args, data)
-    print('Pre-training finished!')
+#     print('Pre-training begin...')
+#     manager_pre = PretrainModelManager(args, data)
+#     manager_pre.train(args, data)
+#     print('Pre-training finished!')

@@ -3,8 +3,7 @@ for dataset in  'banking'
 do
     for known_cls_ratio in 0.75
     do
-        for cluster_num_factor in   1.0 2.0 3.0 4.0
-        do
+        for cluster_num_factor in   1.0
             for seed in 0
             do 
                 python run.py \
@@ -19,7 +18,7 @@ do
                 --backbone 'bert_SDC' \
                 --config_file_name 'SDC' \
                 --gpu_id '0' \
-                --results_file_name 'GCD.csv.csv' \
+                --results_file_name 'SDC.csv' \
                 --save_results \
                 --save_model
             done

@@ -3,6 +3,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from email.policy import strict
 from utils.utils import *
 from utils.sinkhorn_knopp import *
+from utils.functions import save_model, restore_model, set_seed
 from model import *
 from dataloader import *
 import warnings
@@ -19,32 +20,50 @@ from sklearn import mixture
 from transformers import logging, WEIGHTS_NAME
 from init_parameter import init_model
 from pretrain import PretrainSDCManager
-from model import BertForOT, BertForModel
+from ....backbones.bert_sdc import BertForOT, BertForModel
 import seaborn as sn
 class SDCmanager:
 
-    def __init__(self, args, data, pretrained_model):
+    def __init__(self, args, data, model, pretrained_model, logger_name = 'Discovery'):
         pretrain_manager = PretrainSDCManager(args, data)
 
         set_seed(args.seed)
         args.method  = 'bias'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        if pretrained_model is None:
-            pretrained_model = BertForModel(args.bert_model, num_labels=data.n_known_cls)
-            if os.path.exists(args.pretrain_dir):
-                model_file = os.path.join(args.pretrain_dir, 'premodel.pth')
-                pretrained_model.load_state_dict(torch.load(model_file))
-        self.pretrained_model = pretrained_model.to(self.device)
+        # if pretrained_model is None:
+        #     # pretrained_model = BertForModel(args.bert_model, num_labels=data.n_known_cls)
+        #     pretrained_model = pretrain_manager.model
+        #     if os.path.exists(args.pretrain_dir):
+        #         model_file = os.path.join(args.pretrain_dir, 'premodel.pth')
+        #         pretrained_model.load_state_dict(torch.load(model_file))
+        # self.pretrained_model = pretrained_model.to(self.device)
+
+        if args.pretrain:
+            self.pretrained_model = pretrain_manager.model
+            self.pretrained_model.to(self.device)
+            
+        else:
+            self.pretrained_model = restore_model(pretrain_manager.model, os.path.join(args.method_output_dir, 'pretrain'))   
+            if args.train:
+                self.load_pretrained_model(self.pretrained_model)
+            else:
+                self.model = restore_model(self.model, args.model_output_dir)
+        
         if args.cluster_num_factor > 1:
             data.num_labels = self.predict_k(args, data) 
         print(data.num_labels)
-        self.model = BertForOT(args.bert_model, num_labels=data.num_labels)
-        self.model.to(self.device)
-        self.load_pretrained_model()
+        self.model = model
+        loader = data.dataloader
+        self.train_dataloader, self.eval_dataloader, self.test_dataloader, self.train_labeled_dataloader = \
+            loader.train_outputs['loader'], loader.eval_outputs['loader'], loader.test_outputs['loader'], loader.train_labeled_outputs['loader']
+        self.train_semi_dataloader = self.train_dataloader
+        # self.model = BertForOT(args.bert_model, num_labels=data.num_labels)
+        # self.model.to(self.device)
+        self.load_pretrained_model(model)
         # self.evaluation(data)
-        self.initialize_classifier(args, data)
-        self.freeze_parameters(self.model)
+        self.initialize_classifier(args, data, model)
+        self.freeze_parameters(model)
         self.num_train_optimization_steps = int(len(data.train_labeled_examples) / args.train_batch_size) * args.num_pretrain_epochs
         self.optimizer, self.scheduler = self.get_optimizer(args)
 
@@ -170,9 +189,9 @@ class SDCmanager:
                 self.optimizer.zero_grad()
             
 
-    def initialize_classifier(self, args, data):
+    def initialize_classifier(self, args, data, model):
         # extract labeled prototypes
-        feats, labels = self.get_features_labels(data.train_labeled_dataloader, self.model, args)
+        feats, labels = self.get_features_labels(data.dataloader.train_labeled_outputs['loader'], model, args)
         feats = feats.cpu().numpy()
         [rows, _] = feats.shape
         num = np.zeros(data.n_known_cls)
@@ -184,7 +203,7 @@ class SDCmanager:
             self.proto_l[i] = self.proto_l[i] / num[i]
 
         # extract and align unlabeled prototypes
-        feats, _ = self.get_features_labels(data.train_semi_dataloader, self.model, args)
+        feats, _ = self.get_features_labels(self.train_semi_dataloader, self.model, args)
         feats = feats.cpu().numpy()
         km = KMeans(n_clusters = data.num_labels, n_init=20).fit(feats)
         self.proto_u = km.cluster_centers_
@@ -275,11 +294,11 @@ class SDCmanager:
 
         return total_features, total_labels
 
-    def load_pretrained_model(self):
+    def load_pretrained_model(self, model):
         pretrained_dict = self.pretrained_model.state_dict()
         classifier_params = ['classifier.weight', 'classifier.bias']
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in classifier_params}
-        self.model.load_state_dict(pretrained_dict, strict=False)
+        model.load_state_dict(pretrained_dict, strict=False)
 
     def evaluation(self, data):
         self.model.eval()
