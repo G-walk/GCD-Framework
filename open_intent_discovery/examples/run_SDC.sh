@@ -1,9 +1,9 @@
-
 for dataset in  'banking'
 do
     for known_cls_ratio in 0.75
     do
         for cluster_num_factor in   1.0
+        do
             for seed in 0
             do 
                 python run.py \

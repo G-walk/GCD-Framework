@@ -1,8 +1,10 @@
+import logging
 from utils.utils import *
 # from model import *
 # from dataloader import *
-from ....backbones.bert_sdc import BertForModel
-from transformers import WEIGHTS_NAME, CONFIG_NAME, logging
+# from ....backbones.bert_sdc import BertForModel
+from backbones.bert_sdc import BertForModel
+# from transformers import WEIGHTS_NAME, CONFIG_NAME, logging
 import warnings
 # from init_parameter import init_model
 from utils.functions import save_model, restore_model
@@ -20,7 +22,7 @@ class PretrainSDCManager:
         self.model.to(self.device)
 
         self.num_train_optimization_steps = int(
-            len(data.train_labeled_examples) / args.train_batch_size) * args.num_pretrain_epochs
+            len(data.dataloader.train_labeled_examples) / args.train_batch_size) * args.num_pretrain_epochs
 
         self.optimizer, self.scheduler = self.get_optimizer(args)
         self.best_eval_score = 0
@@ -47,7 +49,7 @@ class PretrainSDCManager:
         total_labels = torch.empty(0, dtype=torch.long).to(self.device)
         total_logits = torch.empty((0, data.n_known_cls)).to(self.device)
 
-        for batch in tqdm(data.loader.loader.eval_outputs['loader'], desc="pre-training-eval"):
+        for batch in tqdm(data.dataloader.eval_outputs['loader'], desc="pre-training-eval"):
             batch = tuple(t.to(self.device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             X = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": segment_ids}

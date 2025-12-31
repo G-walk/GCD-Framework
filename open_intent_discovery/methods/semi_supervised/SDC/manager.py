@@ -4,8 +4,8 @@ from email.policy import strict
 from utils.utils import *
 from utils.sinkhorn_knopp import *
 from utils.functions import save_model, restore_model, set_seed
-from model import *
-from dataloader import *
+# from model import *
+# from dataloader import *
 import warnings
 # import ot
 import math
@@ -18,13 +18,14 @@ from scipy.spatial import distance as dist
 from scipy.optimize import linear_sum_assignment
 from sklearn import mixture
 from transformers import logging, WEIGHTS_NAME
-from init_parameter import init_model
-from pretrain import PretrainSDCManager
-from ....backbones.bert_sdc import BertForOT, BertForModel
-import seaborn as sn
+# from init_parameter import init_model
+from .pretrain import PretrainSDCManager
+# from ....backbones.bert_sdc import BertForOT, BertForModel
+# import seaborn as sn
 class SDCmanager:
 
-    def __init__(self, args, data, model, pretrained_model, logger_name = 'Discovery'):
+    # def __init__(self, args, data, model, pretrained_model, logger_name = 'Discovery'):
+    def __init__(self, args, data, model, logger_name = 'Discovery'):
         pretrain_manager = PretrainSDCManager(args, data)
 
         set_seed(args.seed)

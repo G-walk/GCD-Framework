@@ -30,6 +30,7 @@ class Param():
             'train_dir' : 'train_models' ,
             'bert_model' : 'uncased_L-12_H-768_A-12',
             'tokenizer' : 'uncased_L-12_H-768_A-12',
+            'pretrained_bert_model' : 'uncased_L-12_H-768_A-12',
             'max_seq_length' : None, 
             'feat_dim': 768,
             'freeze_bert_parameters': True,
