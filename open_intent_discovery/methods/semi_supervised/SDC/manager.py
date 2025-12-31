@@ -40,32 +40,35 @@ class SDCmanager:
         #         pretrained_model.load_state_dict(torch.load(model_file))
         # self.pretrained_model = pretrained_model.to(self.device)
 
+        self.model = model.set_model(args, data, 'bert')
         if args.pretrain:
             self.pretrained_model = pretrain_manager.model
             self.pretrained_model.to(self.device)
             
         else:
-            self.pretrained_model = restore_model(pretrain_manager.model, os.path.join(args.method_output_dir, 'pretrain'))   
+            self.pretrained_model = restore_model(pretrain_manager.model, os.path.join(args.method_output_dir, 'pretrain'))
+            self.pretrained_model.to(self.device)
             if args.train:
-                self.load_pretrained_model(self.pretrained_model)
+                self.load_pretrained_model(self.model)
             else:
                 self.model = restore_model(self.model, args.model_output_dir)
-        
+        self.model.to(self.device)
+
         if args.cluster_num_factor > 1:
             data.num_labels = self.predict_k(args, data) 
         print(data.num_labels)
-        self.model = model
+        
         loader = data.dataloader
         self.train_dataloader, self.eval_dataloader, self.test_dataloader, self.train_labeled_dataloader = \
             loader.train_outputs['loader'], loader.eval_outputs['loader'], loader.test_outputs['loader'], loader.train_labeled_outputs['loader']
         self.train_semi_dataloader = self.train_dataloader
         # self.model = BertForOT(args.bert_model, num_labels=data.num_labels)
         # self.model.to(self.device)
-        self.load_pretrained_model(model)
+        self.load_pretrained_model(self.model)
         # self.evaluation(data)
-        self.initialize_classifier(args, data, model)
-        self.freeze_parameters(model)
-        self.num_train_optimization_steps = int(len(data.train_labeled_examples) / args.train_batch_size) * args.num_pretrain_epochs
+        self.initialize_classifier(args, data, self.model)
+        self.freeze_parameters(self.model)
+        self.num_train_optimization_steps = int(len(data.dataloader.train_labeled_examples) / args.train_batch_size) * args.num_pretrain_epochs
         self.optimizer, self.scheduler = self.get_optimizer(args)
 
         
@@ -75,7 +78,7 @@ class SDCmanager:
 
     def train(self, args, data):
 
-        unlabeled_iter = iter(data.train_semi_dataloader)
+        unlabeled_iter = iter(self.train_semi_dataloader)
 
         for epoch in range(int(args.num_train_epochs)):
 
@@ -90,7 +93,7 @@ class SDCmanager:
             factor = self.exponential_decay(epoch, 0.4, 80, 0.3)
             threshold = self.exponential_decay(epoch, 0.3, 80, 0.4)
 
-            for batch in tqdm(data.train_labeled_dataloader, desc="Pseudo-label training"):
+            for batch in tqdm(self.train_labeled_dataloader, desc="Pseudo-label training"):
 
                 batch = tuple(t.to(self.device) for t in batch)
                 input_ids, input_mask, segment_ids, labels = batch
@@ -105,7 +108,7 @@ class SDCmanager:
                     batch_u = unlabeled_iter.next()
                     batch_u = tuple(t.to(self.device) for t in batch_u)
                 except StopIteration:
-                    unlabeled_iter = iter(data.train_semi_dataloader)
+                    unlabeled_iter = iter(self.train_semi_dataloader)
                     batch_u = unlabeled_iter.next()
                     batch_u = tuple(t.to(self.device) for t in batch_u)
                 input_ids, input_mask, segment_ids, labels_u = batch_u
@@ -307,7 +310,7 @@ class SDCmanager:
         total_labels = torch.empty(0, dtype=torch.long).to(self.device)
         feats = torch.empty((0, 768)).to(self.device)
 
-        for batch in data.test_dataloader:
+        for batch in self.test_dataloader:
             batch = tuple(t.to(self.device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             X = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": segment_ids}
@@ -342,7 +345,7 @@ class SDCmanager:
         return decay
 
     def predict_k(self, args, data):
-        feats, _ = self.get_features_labels(data.train_semi_dataloader, self.pretrained_model.cuda(), args)
+        feats, _ = self.get_features_labels(self.train_semi_dataloader, self.pretrained_model.cuda(), args)
         feats = feats.cpu().numpy()
         km = KMeans(n_clusters = data.num_labels).fit(feats)
         y_pred = km.labels_

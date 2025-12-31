@@ -41,11 +41,15 @@ class BertForModel(nn.Module):
         return output    
 
 class BERT_SDC(nn.Module):
-    def __init__(self, model_name, num_labels):
+    def __init__(self, args):
         super(BERT_SDC, self).__init__()
-        self.num_labels = num_labels
-        self.model_name = model_name
+        # self.num_labels = num_labels
+        # self.model_name = model_name
+        # args.num_labels_all: 所有类别的总数，包括新旧
+        self.num_labels = args.num_labels_all
+        self.model_name = args.bert_model
         self.backbone = AutoModelForMaskedLM.from_pretrained(self.model_name)
+        self.bert = self.backbone
         self.dropout = nn.Dropout(0.1)
         self.classifier = nn.Linear(self.backbone.config.hidden_size, self.num_labels, bias=False)
 

@@ -35,7 +35,7 @@ class Param():
             'feat_dim': 768,
             'freeze_bert_parameters': True,
             'warmup_proportion': 0.1,
-            'pretrain': True,
+            'pretrain': False,
             'rtr_prob': 0.25,
             'train_batch_size' : 128,
             'pretrain_batch_size' : 128,
@@ -46,9 +46,9 @@ class Param():
             'num_train_epochs': 80,
             'lr_pre': 5e-5,
             'lr': 5e-5, 
-            'num_iter_sk' : 3,
+            'num_iters_sk' : 3,
             'epsilon_sk' : 0.05,
-            'imb-factor' : 1
+            'imb_factor' : 1
         }
 
         return hyper_parameters

@@ -100,6 +100,7 @@ def run(args, logger, debug_args = None):
     set_seed(args.seed)
     logger.info('Data and Model Preparation...')
     data = DataManager(args)
+    args.num_labels_all = len(data.all_label_list)
     model = ModelManager(args, data)
     
     method_manager = method_map[args.method]
