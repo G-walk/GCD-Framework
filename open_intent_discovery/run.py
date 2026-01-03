@@ -64,6 +64,8 @@ def parse_arguments():
     parser.add_argument("--results_file_name", type=str, default = 'results.csv', help="The file name of all the results.")
 
     parser.add_argument("--save_results", action="store_true", help="save final results for open intent detection")
+    
+    parser.add_argument("--test", action="store_true", help="enable test")
 
     args = parser.parse_args()
 
@@ -120,6 +122,24 @@ def run(args, logger, debug_args = None):
         logger.info('Results saved in %s', str(os.path.join(args.result_dir, args.results_file_name)))
         save_results(args, outputs, debug_args=debug_args)
 
+def run_test(args, logger, debug_args = None):
+    set_seed(args.seed)
+    logger.info('Data and Model Preparation...')
+    data = DataManager(args)
+    args.num_labels_all = len(data.all_label_list)
+    model = ModelManager(args, data)
+    
+    method_manager = method_map[args.method]
+    method = method_manager(args, data, model, logger_name = args.logger_name)
+
+    logger.info('Testing begin...')
+    outputs = method.test(args, data)
+    logger.info('Testing finished...')
+
+    if args.save_results:
+        logger.info('Results saved in %s', str(os.path.join(args.result_dir, args.results_file_name)))
+        save_results(args, outputs, debug_args=debug_args)
+
 if __name__ == '__main__':
     
     sys.path.append('.')
@@ -158,6 +178,8 @@ if __name__ == '__main__':
                 args[key] = result[i]         
             
             run(args, logger, debug_args=debug_args)
+    elif args.test:
+        run_test(args, logger)
 
     else:
         run(args, logger)

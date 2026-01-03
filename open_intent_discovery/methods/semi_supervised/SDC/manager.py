@@ -191,6 +191,13 @@ class SDCmanager:
                 self.optimizer.step()
                 self.scheduler.step()
                 self.optimizer.zero_grad()
+
+        if args.save_model:
+            final_model = copy.deepcopy(self.model)
+            model_dir = os.path.join(args.method_output_dir, 'models')
+            if not os.path.exists(model_dir):
+                os.makedirs(model_dir)
+            save_model(final_model, model_dir)
             
 
     def initialize_classifier(self, args, data, model):
@@ -304,13 +311,15 @@ class SDCmanager:
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in classifier_params}
         model.load_state_dict(pretrained_dict, strict=False)
 
-    def evaluation(self, data):
+    def test(self, args, data):
+        if args.test:
+            self.model = restore_model(self.model, os.path.join(args.method_output_dir, 'models'))
         self.model.eval()
         pred_labels = torch.empty(0, dtype=torch.long).to(self.device)
         total_labels = torch.empty(0, dtype=torch.long).to(self.device)
         feats = torch.empty((0, 768)).to(self.device)
 
-        for batch in self.test_dataloader:
+        for batch in tqdm(self.test_dataloader, desc="Evaluating"):
             batch = tuple(t.to(self.device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             X = {"input_ids": input_ids, "attention_mask": input_mask, "token_type_ids": segment_ids}
@@ -332,6 +341,22 @@ class SDCmanager:
         y_pred1 = km.labels_
         results1 = clustering_score(y_true, y_pred1, data.known_lab)
         print('results1', results1)
+
+        outputs = {}
+        
+        # 为分类器指标添加 M_ 前缀 (Model)
+        for k, v in results.items():
+            outputs['M_' + k] = v
+            
+        # 为 K-Means 指标添加 K_ 前缀 (K-Means)
+        for k, v in results1.items():
+            outputs['K_' + k] = v
+
+        # 4. 放入 y_true 和 y_pred 供 save_results 函数提取并保存为 npy
+        outputs['y_true'] = y_true
+        outputs['y_pred'] = y_pred
+
+        return outputs
 
     def restore_model(self, args, model):
         output_model_file = os.path.join(args.pretrain_dir, WEIGHTS_NAME)

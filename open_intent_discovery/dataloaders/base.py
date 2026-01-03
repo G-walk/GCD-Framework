@@ -8,6 +8,12 @@ from .__init__ import max_seq_lengths, backbone_loader_map, benchmark_labels
 class DataManager:
     
     def __init__(self, args, logger_name = 'Discovery'):
+        # SDC相关参数
+        max_seq_lengths = {'hwu': 20, 'clinc': 30, 'banking': 65}
+        beta_list = {'hwu': 0.05, 'clinc': 0.42, 'banking': 0.03}
+        args.max_seq_length = max_seq_lengths[args.dataset]
+        self.beta = beta_list[args.dataset]
+        # SDC相关参数结束
 
         self.logger = logging.getLogger(logger_name)
         args.max_seq_length = max_seq_lengths[args.dataset]
@@ -19,6 +25,7 @@ class DataManager:
             
             self.n_known_cls = round(len(self.all_label_list) * args.known_cls_ratio)
             self.known_label_list = list(np.random.choice(np.array(self.all_label_list), self.n_known_cls, replace=False))
+            self.known_lab = [i for i in range(len(self.known_label_list))]
 
             self.logger.info('The number of known intents is %s', self.n_known_cls)
             self.logger.info('Lists of known labels are: %s', str(self.known_label_list))

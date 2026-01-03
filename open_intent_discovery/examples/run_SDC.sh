@@ -20,7 +20,8 @@ do
                 --gpu_id '0' \
                 --results_file_name 'SDC.csv' \
                 --save_results \
-                --save_model
+                --save_model \
+                --test
             done
         done
     done
