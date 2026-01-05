@@ -35,7 +35,6 @@ class Param():
             'feat_dim': 768,
             'freeze_bert_parameters': True,
             'warmup_proportion': 0.1,
-            'pretrain': False,
             'rtr_prob': 0.25,
             'train_batch_size' : 128,
             'pretrain_batch_size' : 128,

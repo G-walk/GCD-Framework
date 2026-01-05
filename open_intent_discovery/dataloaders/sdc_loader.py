@@ -14,6 +14,7 @@ class SDC_Loader:
     def __init__(self, args, base_attrs, logger_name = 'Discovery'):
 
         self.logger = logging.getLogger(logger_name)
+        self.base_attrs = base_attrs
 
         if args.method == 'SCCL' :
             self.tokenizer = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')[0].tokenizer
@@ -48,7 +49,11 @@ class SDC_Loader:
             self.train_unlabeled_outputs = get_loader(self.train_unlabeled_examples, args, base_attrs['all_label_list'], 'train_unlabeled', self.tokenizer)
             self.train_outputs = get_semi_loader(self.train_labeled_examples, self.train_unlabeled_examples, base_attrs, args, self.tokenizer)
             self.eval_outputs = get_loader(self.eval_examples, args, base_attrs['known_label_list'], 'eval', self.tokenizer)
-            self.test_outputs = get_loader(self.test_examples, args, base_attrs['all_label_list'], 'test', self.tokenizer)
+            if args.method in ['SDC']:
+                self.test_outputs = get_test_loader(self.test_examples, args, base_attrs['known_label_list'], base_attrs['all_label_list'], 'test', self.tokenizer)
+            else:
+                self.test_outputs = get_loader(self.test_examples, args, base_attrs['all_label_list'], 'test', self.tokenizer)
+                
             if args.method == 'DTC_BERT':
                 self.get_examples_dtc_predict(args ,base_attrs)
 
@@ -133,8 +138,51 @@ def get_examples(args, base_attrs, mode):
             return ori_examples
 
 def get_loader(examples, args, label_list, mode, tokenizer):
-    
+
     features = convert_examples_to_features(examples, label_list, args.max_seq_length, tokenizer)
+    input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+    input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+    segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+
+    if mode == 'train_unlabeled':
+        label_ids = torch.tensor([-1 for f in features], dtype=torch.long)
+    else:
+        label_ids = torch.tensor([f.label_id for f in features], dtype=torch.long)
+
+
+    datatensor = TensorDataset(input_ids, input_mask, segment_ids, label_ids)
+
+    if mode == 'train_labeled':  
+        sampler = RandomSampler(datatensor)
+        dataloader = DataLoader(datatensor, sampler=sampler, batch_size = args.train_batch_size, num_workers = args.num_workers, pin_memory = True)  #, num_workers = args.num_workers, pin_memory = True
+
+    else:
+        sampler = SequentialSampler(datatensor)
+
+        if mode == 'train_unlabeled':
+            dataloader = DataLoader(datatensor, sampler=sampler, batch_size = args.train_batch_size, num_workers = args.num_workers, pin_memory = True)    
+
+        elif mode == 'eval':
+            dataloader = DataLoader(datatensor, sampler=sampler, batch_size = args.eval_batch_size, num_workers = args.num_workers, pin_memory = True)
+        
+        elif mode == 'test':
+            dataloader = DataLoader(datatensor, sampler=sampler, batch_size = args.test_batch_size, num_workers = args.num_workers, pin_memory = True)
+
+    outputs = {
+        'loader': dataloader,
+        'input_ids': input_ids,
+        'input_mask': input_mask,
+        'segment_ids': segment_ids,
+        'label_ids': label_ids,
+        'data': datatensor
+    }
+    
+    return outputs
+
+# 加载SDC的测试集
+def get_test_loader(examples, args, label_list, all_list, mode, tokenizer):
+    
+    features = convert_examples_to_features_test(examples, label_list, all_list, args.max_seq_length, tokenizer)
     input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
     input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
     segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
@@ -177,7 +225,10 @@ def get_loader(examples, args, label_list, mode, tokenizer):
 def get_semi_loader(labeled_examples, unlabeled_examples, base_attrs, args, tokenizer):
 
     labeled_features = convert_examples_to_features(labeled_examples, base_attrs['known_label_list'], args.max_seq_length, tokenizer)
-    unlabeled_features = convert_examples_to_features(unlabeled_examples, base_attrs['all_label_list'], args.max_seq_length, tokenizer)
+    if args.method in ['SDC']:
+        unlabeled_features = convert_examples_to_features_test(unlabeled_examples, base_attrs['known_label_list'], base_attrs['all_label_list'], args.max_seq_length, tokenizer)
+    else:
+        unlabeled_features = convert_examples_to_features(unlabeled_examples, base_attrs['all_label_list'], args.max_seq_length, tokenizer)
     
     labeled_input_ids = torch.tensor([f.input_ids for f in labeled_features], dtype=torch.long)
     labeled_input_mask = torch.tensor([f.input_mask for f in labeled_features], dtype=torch.long)
@@ -298,6 +349,84 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     label_map = {}
     for i, label in enumerate(label_list):
         label_map[label] = i
+    features = []
+    for (ex_index, example) in enumerate(examples):
+        tokens_a = tokenizer.tokenize(example.text_a)
+
+        tokens_b = None
+        if example.text_b:
+            tokens_b = tokenizer.tokenize(example.text_b)
+            # Modifies `tokens_a` and `tokens_b` in place so that the total
+            # length is less than the specified length.
+            # Account for [CLS], [SEP], [SEP] with "- 3"
+            _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
+        else:
+            # Account for [CLS] and [SEP] with "- 2"
+            if len(tokens_a) > max_seq_length - 2:
+                tokens_a = tokens_a[:(max_seq_length - 2)]
+
+        # The convention in BERT is:
+        # (a) For sequence pairs:
+        #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
+        #  type_ids: 0   0  0    0    0     0       0 0    1  1  1  1   1 1
+        # (b) For single sequences:
+        #  tokens:   [CLS] the dog is hairy . [SEP]
+        #  type_ids: 0   0   0   0  0     0 0
+        #
+        # Where "type_ids" are used to indicate whether this is the first
+        # sequence or the second sequence. The embedding vectors for `type=0` and
+        # `type=1` were learned during pre-training and are added to the wordpiece
+        # embedding vector (and position vector). This is not *strictly* necessary
+        # since the [SEP] token unambigiously separates the sequences, but it makes
+        # it easier for the model to learn the concept of sequences.
+        #
+        # For classification tasks, the first vector (corresponding to [CLS]) is
+        # used as as the "sentence vector". Note that this only makes sense because
+        # the entire model is fine-tuned.
+        tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
+        segment_ids = [0] * len(tokens)
+
+        if tokens_b:
+            tokens += tokens_b + ["[SEP]"]
+            segment_ids += [1] * (len(tokens_b) + 1)
+
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+        # The mask has 1 for real tokens and 0 for padding tokens. Only real
+        # tokens are attended to.
+        input_mask = [1] * len(input_ids)
+
+        # Zero-pad up to the sequence length.
+        padding = [0] * (max_seq_length - len(input_ids))
+        input_ids += padding
+        input_mask += padding
+        segment_ids += padding
+
+        assert len(input_ids) == max_seq_length
+        assert len(input_mask) == max_seq_length
+        assert len(segment_ids) == max_seq_length
+
+        label_id = label_map[example.label]
+
+        features.append(
+            InputFeatures(input_ids=input_ids,
+                          input_mask=input_mask,
+                          segment_ids=segment_ids,
+                          label_id=label_id))
+    return features
+
+# 加载SDC的测试集，有特殊的标签映射规则
+def convert_examples_to_features_test(examples, known_list, all_list, max_seq_length, tokenizer):
+    label_map = {}
+    # 1. 先映射已知类 (0 到 K-1)
+    for i, label in enumerate(known_list):
+        label_map[label] = i
+    
+    # 2. 再映射新类 (K 到 N)
+    novel_list = [l for l in all_list if l not in known_list]
+    for i, label in enumerate(novel_list):
+        if label not in label_map: # 防止重复
+            label_map[label] = i + len(known_list)
     features = []
     for (ex_index, example) in enumerate(examples):
         tokens_a = tokenizer.tokenize(example.text_a)

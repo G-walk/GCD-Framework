@@ -21,7 +21,7 @@ do
                 --results_file_name 'SDC.csv' \
                 --save_results \
                 --save_model \
-                --test
+                --pretrain
             done
         done
     done

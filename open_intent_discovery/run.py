@@ -67,6 +67,8 @@ def parse_arguments():
     
     parser.add_argument("--test", action="store_true", help="enable test")
 
+    parser.add_argument("--pretrain", action="store_true", help="enable pretrain")
+
     args = parser.parse_args()
 
     return args
