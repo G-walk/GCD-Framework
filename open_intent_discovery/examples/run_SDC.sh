@@ -4,12 +4,12 @@ do
     do
         for cluster_num_factor in   1.0
         do
-            for seed in 0
+            for seed in 0 1 2
             do 
                 python run.py \
                 --dataset $dataset \
                 --method 'SDC' \
-                --train \
+                --test \
                 --setting 'semi_supervised' \
                 --labeled_ratio 0.1 \
                 --known_cls_ratio $known_cls_ratio \
@@ -20,8 +20,8 @@ do
                 --gpu_id '0' \
                 --results_file_name 'SDC.csv' \
                 --save_results \
-                --save_model \
-                --pretrain
+                --save_model
+                # --pretrain
             done
         done
     done

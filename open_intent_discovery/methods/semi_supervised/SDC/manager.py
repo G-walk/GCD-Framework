@@ -314,6 +314,7 @@ class SDCmanager:
     def test(self, args, data):
         if args.test:
             self.model = restore_model(self.model, os.path.join(args.method_output_dir, 'models'))
+            # self.load_pretrained_model(self.model)
         self.model.eval()
         pred_labels = torch.empty(0, dtype=torch.long).to(self.device)
         total_labels = torch.empty(0, dtype=torch.long).to(self.device)

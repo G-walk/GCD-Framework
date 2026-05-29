@@ -46,6 +46,7 @@ class SDC_Loader:
             self.logger.info("Number of testing samples = %s", str(len(self.test_examples)))
             
             self.train_labeled_outputs = get_loader(self.train_labeled_examples, args, base_attrs['known_label_list'], 'train_labeled', self.tokenizer)
+            # TODO 没有做标签匹配（已知类在前新类在后），但是SDC没有用到unlabled_loader
             self.train_unlabeled_outputs = get_loader(self.train_unlabeled_examples, args, base_attrs['all_label_list'], 'train_unlabeled', self.tokenizer)
             self.train_outputs = get_semi_loader(self.train_labeled_examples, self.train_unlabeled_examples, base_attrs, args, self.tokenizer)
             self.eval_outputs = get_loader(self.eval_examples, args, base_attrs['known_label_list'], 'eval', self.tokenizer)
@@ -227,6 +228,7 @@ def get_semi_loader(labeled_examples, unlabeled_examples, base_attrs, args, toke
     labeled_features = convert_examples_to_features(labeled_examples, base_attrs['known_label_list'], args.max_seq_length, tokenizer)
     if args.method in ['SDC']:
         unlabeled_features = convert_examples_to_features_test(unlabeled_examples, base_attrs['known_label_list'], base_attrs['all_label_list'], args.max_seq_length, tokenizer)
+        # unlabeled_features = convert_examples_to_features(unlabeled_examples, base_attrs['all_label_list'], args.max_seq_length, tokenizer)
     else:
         unlabeled_features = convert_examples_to_features(unlabeled_examples, base_attrs['all_label_list'], args.max_seq_length, tokenizer)
     
